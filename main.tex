@@ -1,0 +1,28 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{bibtex}
+
+\title{Dissertation}
+\author{Jamie Day}
+\date{October 2024}
+
+\begin{document}
+
+\maketitle
+
+\section{Background}
+
+ - what are effect handlers?
+    - effect handlers are OS-like function calls
+    - they are useful for many things including threading and implementing generators
+
+ - what is libseff?
+    - libseff is a performant implementation of effect handlers for C. Unlike other effect handlers it is written for user use rather than as a library for compilers
+    - (provide some example libseff code)
+    - the fact that libseff runs fast is important to its USP (insert benchmarks showing its pretty fast)
+    - however, libseff can only hold up to 64 different effects, and you need to make sure these don't overlap with other effects in libraries you import, which is inconvenient and not how most software works.
+
+- what will I be doing?
+    - I will be expanding it from these 64 bits upward
+    - the part of this in the background should be very short
+\end{document}
