@@ -1,6 +1,5 @@
 \documentclass{article}
 \usepackage{graphicx} % Required for inserting images
-\usepackage{bibtex}
 
 \title{Dissertation}
 \author{Jamie Day}
@@ -9,8 +8,14 @@
 \begin{document}
 
 \maketitle
-
+\section{Introduction}
 \section{Background}
+
+Effect handlers and the associated effects are very useful tools - they allow for scoped handling and the passing of continuations. Treating a continuation as an object is useful in many applications and there are effect handler implementations for most major programming languages that don't have this capacity natively.\cite{libseff_paper} An important aspect of effect handlers is that if the lowest scoped handler cannot handle the effect that is requested, the request will bubble up through the scoped handlers until it reaches a handler that can (and otherwise will throw an exception). Effect handlers can be used for many use cases, including cooperative concurrency and creating generators, although they can only really shine over a function-based method in large codebases.
+\\
+
+\textbf{libseff} is an implementation of effect handlers for C that is designed to be used by programmers directly.\cite{libseff_paper} Currently whenever you define an effect in \textbf{libseff} you need to provide a unique numerical id, and this could cause some difficult-to-find because your id cannot overlap with ids defined in libraries that you import, which is unintuitive, and in this case most of your code will probably still work since this behaviour only causes errors when handlers for effects with conflicting ids both wrap the same code, and the undesirable handler is closer to the code. [add citation about why having to look at outside libraries is a bad idea]. Another issue is that the number of effects one can define is limited to 64, which is sufficient for most small libraries but may run out in the large codebases where effect handlers of this type really shine. [example code of effects and libseff goes somewhere here]
+\\
 
  - what are effect handlers?
     - effect handlers are OS-like function calls
@@ -25,4 +30,10 @@
 - what will I be doing?
     - I will be expanding it from these 64 bits upward
     - the part of this in the background should be very short
+
+
+
+
+\bibliography{refs}
+\bibliographystyle{plain}
 \end{document}
