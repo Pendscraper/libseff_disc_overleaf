@@ -1,5 +1,6 @@
 \documentclass{article}
 \usepackage{graphicx} % Required for inserting images
+\usepackage[utf8]{inputenc}
 
 \title{Dissertation}
 \author{Jamie Day}
@@ -11,28 +12,37 @@
 \section{Introduction}
 \section{Background}
 
-Effect handlers and the associated effects are very useful tools - they allow for scoped handling and the passing of continuations. Treating a continuation as an object is useful in many applications and there are effect handler implementations for most major programming languages that don't have this capacity natively.\cite{libseff_paper} An important aspect of effect handlers is that if the lowest scoped handler cannot handle the effect that is requested, the request will bubble up through the scoped handlers until it reaches a handler that can (and otherwise will throw an exception). Effect handlers can be used for many use cases, including cooperative concurrency and creating generators, although they can only really shine over a function-based method in large codebases.
-\\
+Effect handlers and the associated effects are a type of control flow pattern that have many applications, including for backtracking, cooperative multi-threading and more.\cite{effect_handlers_tutorial} A programmer will define specific \textit{effects}, and instantiate specific \textit{effect handlers} that will handle all effects of a predetermined type that are called within its scope. For example: 
 
-\textbf{libseff} is an implementation of effect handlers for C that is designed to be used by programmers directly.\cite{libseff_paper} Currently whenever you define an effect in \textbf{libseff} you need to provide a unique numerical id, and this could cause some difficult-to-find because your id cannot overlap with ids defined in libraries that you import, which is unintuitive, and in this case most of your code will probably still work since this behaviour only causes errors when handlers for effects with conflicting ids both wrap the same code, and the undesirable handler is closer to the code. [add citation about why having to look at outside libraries is a bad idea]. Another issue is that the number of effects one can define is limited to 64, which is sufficient for most small libraries but may run out in the large codebases where effect handlers of this type really shine. [example code of effects and libseff goes somewhere here]
-\\
+\includegraphics[scale=0.4]{pseudocode handler.png}
 
- - what are effect handlers?
-    - effect handlers are OS-like function calls
-    - they are useful for many things including threading and implementing generators
+Here the output would be "inner 1 outer 2 inner 3 ". Note that this does not include the output "final" - the continuation does not have to be resumed after the error is handled. Note also that we can consider the second inner IF (that prints "inner 2 ") and the third outer IF to be dead code, since they don't handle this effect.
 
- - what is libseff?
-    - libseff is a performant implementation of effect handlers for C. Unlike other effect handlers it is written for user use rather than as a library for compilers
-    - (provide some example libseff code)
-    - the fact that libseff runs fast is important to its USP (insert benchmarks showing its pretty fast)
-    - however, libseff can only hold up to 64 different effects, and you need to make sure these don't overlap with other effects in libraries you import, which is inconvenient and not how most software works.
+The key part to notice is what happens with effect 2 - the effect call "bubbles up" the stack of effect handlers until it finds a handler that can handle it. This is a key concept when it comes to effect handlers.
 
-- what will I be doing?
-    - I will be expanding it from these 64 bits upward
-    - the part of this in the background should be very short
+Note that since the inner handler does not handle the \textbf{[name]} effect, the effect call continues bubbling up the call stack until it finds the first handler that does handle it. This compositionality is essential to effect handlers usefulness %[rewrite this sentence].
 
 
 
+
+
+
+
+
+
+Although much of the current usage of effect handlers is found in functional languages, there exist libraries that implement effect handling in almost every major language in which it is possible, including C. However, these libraries, such as \textbf{libmpeff}, are mostly designed specifically for compiler implementation, and as such offer features and make implementation decisions that do not necessarily make sense for the generic use case.\cite{libmprompt} \textbf{libseff}, on the other hand, is an implementation of effect handlers for C that is designed to be used by programmers directly.\cite{libseff_paper}
+
+Currently defining an effect looks like this: %[image]
+
+and calling it looks like this: %[image]
+
+You may note that when defining the effect it is necessary to pass an integer id that defines the effect. This is a necessary detail of the current implementation of \textbf{libseff}: which effects a specific handler handles are stored as a single 64-bit integer, where each bit represents whether a handler represents that index of effect. This means that the number of IDs is limited to 64, meaning there can be at most 64 different  effects defined in a \textbf{libseff} program. This is the problem that this study will aim to solve.
+
+This was implemented to increase speed at runtime, since this is a priority of the original \textbf{libseff} implementation. %[cite here]  
+
+A further problem with this approach is that IDs must be independent even between libraries, which is unintuitive and generally makes including libraries that use libseff unnecessarily complicated, since it is necessary to ensure that the ids of effects do not collide, and the maximum limit of 64 effects may start to become relevant in this case.
+
+This may cause unpredictable errors, since [cite 2.1 of the paper] errors are only caused when handlers with the same id are interlaced and then an effect is called that is meant to be handled by the handler higher in the heirarchy, but is handled by the lower one because the ids match. This doesn't cause an exception but fails silently and unpredictably which is a recipe for chaos. %[change this]
 
 \bibliography{refs}
 \bibliographystyle{plain}
