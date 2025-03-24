@@ -197,15 +197,18 @@ As stated above, in libseff effect IDs must be assigned manually by the programm
  - The number of IDs able to be defined must not be bound in any meaningful way
  - Given the above constraints, checking whether a handler handles a given effect should be as fast as possible
 
-First we turn our attention to ID generation. As widely noted [CITE HERE], Universally Unique Identifiers (UUIDs) can be generated through the use of a so-called "magic pointer" [CITE PLS], or a pointer to a fixed location in memory. Since pointers in C are guaranteed by the standard to only compare equal if they point to the same location [CITE], (as perhaps you would expect), if a new memory address is assigned for each new effect, IDs generated this way are guaranteed to be unique. In this particular case, user-defined effect IDs are actually a pointer to the address that stores where the default generator for that effect is (it's a double pointer), because this is useful later.
+First we turn our attention to ID generation. As widely noted%[CITE HERE]
+, Universally Unique Identifiers (UUIDs) can be generated through the use of a so-called "magic pointer"%[CITE PLS]
+, or a pointer to a fixed location in memory. Since pointers in C are guaranteed by the standard to only compare equal if they point to the same location%[CITE]
+, (as perhaps you would expect), if a new memory address is assigned for each new effect, IDs generated this way are guaranteed to be unique. In this particular case, user-defined effect IDs are actually a pointer to the address that stores where the default generator for that effect is (it's a double pointer), because this is useful for fetching default handlers and there is no reason not to.
 
-[INSERT CODE IMAGE HERE]
+\includegraphics[scale=0.7]{ID_def_code.png}
 
-One issue with this is that effect IDs are no longer fixed at compile time, which causes a few innefficiencies - for example, these effects can no longer be used in C's \textcolor{teal}{case} statements. Indeed, this cannot be avoided with any implementation that guarantees uniqueness without requiring knowledge of IDs chosen by included libraries, since dynamic libraries are only available at link time.
+One issue with this is that effect IDs are no longer fixed at compile time, which causes a few inefficiencies - for example, these effects can no longer be used in C's \textcolor{teal}{case} statements. Indeed, this cannot be avoided with any implementation that guarantees uniqueness without requiring knowledge of IDs chosen by included libraries, since dynamic libraries are only available at link time.
 
 \section{Effect set representation}
 
-Previously, effect sets were represented as a 64-bit integer, with each bit being 1 implying the handling of the effect with that index as an ID, and similarly 0 means its not handled, as shown below: [INCLUDE IMAGE OF 0s with like 2 ones and some arrows to them that say "this handles effect 3 and effect 12"]
+Previously, effect sets were represented as a 64-bit integer, with each bit being 1 implying the handling of the effect with that index as an ID, and similarly 0 means its not handled, as shown below: %[INCLUDE IMAGE OF 0s with like 2 ones and some arrows to them that say "this handles effect 3 and effect 12"]
 
 The current solution works more like a string - the effect set is a 0-terminated list of word-length integers, each corresponding to an effect. While this does add another layer of pointer indirection, which had [INSERT EFFECT BELOW] as shown below, it also allows the handling of any number of effects per handler, and importantly also implies that the total number of valid effect IDs is not limited to 64, as the previous implementation implied.
 
