@@ -13,7 +13,7 @@
 % layout or style of the dissertation. By including the ugcheck package above,
 % you should catch most accidental changes of page layout though.
 
-\usepackage{microtype} % recommended, but you can remove if it causes problems
+\usepackage[nopatch=footnote]{microtype} % recommended, but you can remove if it causes problems
 \usepackage[round]{natbib} % recommended for citations
 \usepackage{graphicx}
 \usepackage{xcolor}
@@ -73,9 +73,9 @@ from the Informatics Research Ethics committee.
 \end{ethics}
 
 
-\begin{acknowledgements}
-Any acknowledgements go here.
-\end{acknowledgements}
+%\begin{acknowledgements}
+%I would like to thank Saj's Shawarma and Grill, for always having my back through these hard times.
+%\end{acknowledgements}
 
 
 \tableofcontents
@@ -173,7 +173,7 @@ Note that since the inner handler does not handle the \textbf{[name]} effect, th
 
 \section{What is libseff?}
 
-Although much of the current usage of effect handlers is found in functional languages, there exist libraries that implement effect handling in almost every major language in which it is possible, including C. However, these libraries, such as \textbf{libmpeff}, are mostly designed specifically for compiler implementation, and as such offer features and make implementation decisions that do not necessarily make sense for the generic use case.\cite{libmprompt} \textbf{libseff}, on the other hand, is an implementation of effect handlers for C that is designed to be used by programmers directly.\cite{libseff_paper}
+Although much of the current usage of effect handlers is found in functional languages, there exist libraries that implement effect handling in almost every major language in which it is possible, including C. However, these libraries, such as \textbf{libmpeff}, are mostly designed specifically for compiler implementation, and as such offer features and make implementation decisions that do not necessarily make sense for the generic use case.\cite{libmprompt} \textbf{libseff}, on the other hand, is an implementation of effect handlers for C that is designed to be used directly by programmers.\cite{libseff_paper}
 
 Currently defining an effect looks like this: %[image]
 
@@ -187,7 +187,7 @@ A further problem with this approach is that IDs must be independent even betwee
 
 This may cause unpredictable errors, since [cite 2.1 of the paper] errors are only caused when handlers with the same id are interlaced and then an effect is called that is meant to be handled by the handler higher in the heirarchy, but is handled by the lower one because the ids match. This doesn't cause an exception but fails silently and unpredictably which is a recipe for chaos. %[change this]
 
-\chapter{Goals}
+\chapter{Changes Made}
 
 \section{ID assignment}
 
@@ -219,9 +219,9 @@ These changes required changes to the syntax of the libseff library. Users now n
 
 This syntax is slightly more unwieldy but ultimately the provided macros are simply syntactic sugar for unpacking the payload and do not need to be used for users to apply the full range of libseff.
 
-\chapter{Implementation}
-
 \chapter{Evaluation}
+
+bangers one and all. I have never done anything wrong and I never shall.
 
 \chapter{Conclusion}
 
