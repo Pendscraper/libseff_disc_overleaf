@@ -17,11 +17,12 @@
 \usepackage[round]{natbib} % recommended for citations
 \usepackage{graphicx}
 \usepackage{xcolor}
+\usepackage{hyperref}
 
 \begin{document}
 \begin{preliminary}
 
-\title{This is the Project Title}
+\title{Extensions to libseff, an effect handler implementation using continuations in C}
 
 \author{Jamie Day}
 
@@ -49,12 +50,7 @@
 \date{\today}
 
 \abstract{
-This skeleton demonstrates how to use the \texttt{infthesis} style for
-undergraduate dissertations in the School of Informatics. It also emphasises the
-page limit, and that you must not deviate from the required style.
-The file \texttt{skeleton.tex} generates this document and should be used as a
-starting point for your thesis. Replace this abstract text with a concise
-summary of your report.
+\textit{libseff} is a lightweight effect handlers library for C using continuations. This paper investigates the existing performance of handler resolution and effect definition in this language, and implements and benchmarks new systems for each, which are found to increase the expressiveness of the language without affecting performance.
 }
 
 \maketitle
@@ -84,123 +80,147 @@ from the Informatics Research Ethics committee.
 
 \chapter{Introduction}
 
-The preliminary material of your report should contain:
-\begin{itemize}
-\item
-The title page.
-\item
-An abstract page.
-\item
-Declaration of ethics and own work.
-\item
-Optionally an acknowledgements page.
-\item
-The table of contents.
-\end{itemize}
+\section{Handlers' History and Usage}
+Effect handlers are a control-flow paradigm that have been growing in popularity recently. \citep{effekt-paper} First invented as a programming construct at the University of Edinburgh, they have come into use by companies worldwide, including GitHub and Uber, and are used by tens of millions of developers worldwide through React's Hook implementation. \citep{impact_study}
 
-As in this example \texttt{skeleton.tex}, the above material should be
-included between:
-\begin{verbatim}
-\begin{preliminary}
-    ...
-\end{preliminary}
-\end{verbatim}
-This style file uses roman numeral page numbers for the preliminary material.
+While the first description of effect handlers in \citet{og-paper} was written in "a style that required
+considerable mathematical sophistication to understand", \citep{impact_study} a later position paper by \citeauthor{action-position-paper} served to popularise the abstraction.
 
-The main content of the dissertation, starting with the first chapter,
-starts with page~1. \emph{\textbf{The main content must not go beyond page~40.}}
+\section{What even are effect handlers?}
+An \textit{effect} is an operation or group of operations that can be \textit{performed} to do some kind of action that cannot be done from local code. 
 
-The report then contains a bibliography and any appendices, which may go beyond
-page~40. The appendices are only for any supporting material that's important to
-go on record. However, you cannot assume markers of dissertations will read them.
+Effect handlers can be conceptualised in many ways. One way of thinking about effect handlers, and the lens through which the abstraction was originally invented in \cite{og-paper}, is as a generalisation of exception handlers - an exception handler that can return to the point the exception was raised is an effect handler. \citep{ocaml-paper}
 
-You may not change the dissertation format (e.g., reduce the font size, change
-the margins, or reduce the line spacing from the default single spacing). Be
-careful if you copy-paste packages into your document preamble from elsewhere.
-Some \LaTeX{} packages, such as \texttt{fullpage} or \texttt{savetrees}, change
-the margins of your document. Do not include them!
-
-Over-length or incorrectly-formatted dissertations will not be accepted and you
-would have to modify your dissertation and resubmit. You cannot assume we will
-check your submission before the final deadline and if it requires resubmission
-after the deadline to conform to the page and style requirements you will be
-subject to the usual late penalties based on your final submission time.
-
-\section{Using Sections}
-
-Divide your chapters into sub-parts as appropriate.
-
-\section{Citations}
-
-When citing work using author names, your sentences should still read
-as correct English if any parts in parenthesis are removed.
-Use {\tt {\textbackslash}citet} when citing the name as text that's part of your sentence: 
-%\begin{quote}
-%  We follow the method of \citet{P1}.
-%\end{quote}
-%and use {\tt {\textbackslash}citep} for a parenthetical citation:
-%\begin{quote}
-%  It's possible to learn first-order Horn sequences from entailment \citep{P2}.
-%\end{quote}
-
-You may use any consistent reference style that you prefer, including ``[1]'' numerical citations. 
-
-
-
-
-
-
-
-
-\chapter{Context}
-
-\section{What are effect handlers?}
-Effect handlers and the associated effects are a type of control flow pattern that have many applications, including for backtracking, cooperative multi-threading and more.\cite{effect_handlers_tutorial} A programmer will define specific \textit{effects}, and instantiate specific \textit{effect handlers} that will handle all effects of a predetermined type that are called within its scope. For example: 
-
-\includegraphics[scale=0.4]{pseudocode_handler.png}
-
-Here the output would be "inner 1 outer 2 inner 3 ". Note that this does not include the output "final" - the continuation does not have to be resumed after the error is handled. Note also that we can consider the second inner IF (that prints "inner 2 ") and the third outer IF to be dead code, since they don't handle this effect.
-
-The key part to notice is what happens with effect 2 - the effect call "bubbles up" the stack of effect handlers until it finds a handler that can handle it. This is a key concept when it comes to effect handlers.
-
-Note that since the inner handler does not handle the \textbf{[name]} effect, the effect call continues bubbling up the call stack until it finds the first handler that does handle it. This compositionality is essential to effect handlers usefulness %[rewrite this sentence].
-
-
-
-
-
-
+Effect handlers can also be considered as calls to a function whose implementation depends on context, and which is not guaranteed to return. Which handler will handle the effect (and hence in this interpretation implement the function) depends on the context in which this block of code is running. \citep{award-paper}
 
 \section{What is libseff?}
 
-Although much of the current usage of effect handlers is found in functional languages, there exist libraries that implement effect handling in almost every major language in which it is possible, including C. However, these libraries, such as \textbf{libmpeff}, are mostly designed specifically for compiler implementation, and as such offer features and make implementation decisions that do not necessarily make sense for the generic use case.\cite{libmprompt} \textbf{libseff}, on the other hand, is an implementation of effect handlers for C that is designed to be used directly by programmers.\cite{libseff_paper}
+\textit{libseff} is an implementation of this idea in C. Differentiating \textit{libseff} from other implementations of effect handlers in C is its intended use by the general programming community, rather than specifically compiler writers, as is the case with languages such as \textit{libmpeff}. \citep{libseff_paper} \citep{libmprompt} \textit{libseff} is also designed to be as lightweight as possible to allow its use in embedded systems. \citep{libseff_paper}
 
-Currently defining an effect looks like this: %[image]
+\textit{libseff} at the time of writing has several peculiarities that make it unsuitable for use in production code in a large codebase. For example, the following code defines an effect: 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{eff_def.png}
+    \caption{Taken from the ad.c test in the libseff repo}
+\end{figure}
 
-and calling it looks like this: %[image]
+The leftmost argument to the macro is the name of the effect. The next argument is the ID of the effect, and this will be discussed below. The final arguments are the return value of the effect and a struct representing the parameters to the effect (all effects in \textit{libseff}, barring the return effect, must return a struct).
 
-You may note that when defining the effect it is necessary to pass an integer id that defines the effect. This is a necessary detail of the current implementation of \textbf{libseff}: which effects a specific handler handles are stored as a single 64-bit integer, where each bit represents whether a handler represents that index of effect. This means that the number of IDs is limited to 64, meaning there can be at most 64 different  effects defined in a \textbf{libseff} program. This is the problem that this study will aim to solve.
+The ID is an integer that is used for the representation of effects - the PERFORM macro passes this value to the handler resolution function to find the relevant handler, for example. Requiring this to be predefined by the programmer is quite unusual and inconvenient - more on this in Chapter \ref{method}.
 
-This was implemented to increase speed at runtime, since this is a priority of the original \textbf{libseff} implementation. %[cite here]  
+Another issue relating to the implementation of libseff is that only a maximum of 64 effects can be defined - again, more on this in \ref{method}.
 
-A further problem with this approach is that IDs must be independent even between libraries, which is unintuitive and generally makes including libraries that use libseff unnecessarily complicated, since it is necessary to ensure that the ids of effects do not collide, and the maximum limit of 64 effects may start to become relevant in this case.
+These issues were solved - effect IDs are now autogenerated through being pointers to allocated memory, and libseff is now no longer limited in the number of effects it can represent.
 
-This may cause unpredictable errors, since [cite 2.1 of the paper] errors are only caused when handlers with the same id are interlaced and then an effect is called that is meant to be handled by the handler higher in the heirarchy, but is handled by the lower one because the ids match. This doesn't cause an exception but fails silently and unpredictably which is a recipe for chaos. %[change this]
+These solutions were found to give negligible performance loss on most use cases.
 
-\chapter{Changes Made}
+
+
+
+
+\chapter{Context} \label{background}
+
+\section{What are effect handlers?}
+Effect handlers are a control flow mechanism that can be considered in several different ways: for example, as a generalisation of exception handlers. \citep{sep-log} The only difference is that exception handlers cannot return to the site where the exception was raised - effect handlers can. More specifically, effect handlers are passed a continuation, (often restricted in some way, such as delimitation \citep{old-paper}), that represents the code that requested the effect.
+
+Such abstractions have many potential applications, including for backtracking, cooperative multi-threading and more \citep{effect_handlers_tutorial}. Real-world usage of this abstraction is already a reality, with use by Uber, Google, Facebook and more. \citep{impact_study}
+
+Effect handler semantic systems have three parts:
+\begin{itemize}
+\item An \textit{effect signature}, which defines an effect
+\item The instantiation of a \textit{handler}, which will handle the passed in coroutine
+\item The site where the effect is performed
+\end{itemize}
+
+In Effekt \citep{effekt-paper} these three things look like this:
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\linewidth]{basic_demo.png}
+    \caption{Three parts of Effekt code showing the three different components of effect handlers. Adapted from \url{https://effekt-lang.org/quickstart}}
+    \label{fig:basic}
+\end{figure}
+
+Let us expand from this basic example with something more involved:
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{effekt_2.png}
+    \caption{More complex Effekt code}
+    \label{fig:efkt2}
+\end{figure}
+\pagebreak
+From this program we recieve the following output:
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.5\linewidth]{effekt_2_out.png}
+    \caption{Program output}
+\end{figure}
+
+This program displays several of the characteristic behaviours of effect handlers. First, note that effects will be handled in the closest (most recently wrapped) suitable handler - but that is not necessarily the closest handler. Further, the \textcolor{purple}{flight} operation is not required to return to the calling function; it is at the handler's discretion. Note also that data can be passed in and out of operation performances.
+
+
+\section{Variants}
+There are several different interpretations and implementations of effect handlers, with varying degrees of expressiveness and intuitiveness. Below are some of the more relevant divides.
+
+\subsection{Lexical vs Dynamic binding}
+
+Two methods for binding/scoping/resolving handlers are lexical and dynamic binding. Lexical binding has the advantage that handler resolution is a constant-time operation, but requires either a restrictive implementation or an expansive type system. As C barely possesses a type system at all, it was inevitable that libseff would use dynamic binding.
+
+\subsection{Grouped vs Ungrouped Operations}
+
+While in the ungrouped form effects are a single operation that is performed by itself, and a handler can handle many effects, with grouped operations an effect is a group of operations, and each handler can only handle one group. In this way effect definition looks more like interface definition in Java for example. libseff uses ungrouped effects (sometimes called singleton effects \citep{effekt-website}), which was judged to be more useful for the average programmer than the libmpeff implementation, which is grouped.
+
+\subsection{Single vs Multishot continuations}
+
+A handler that uses singleshot continuations can only resume a given continuation once, after which it will be overwritten by a new continuation or in some other way made invalid. Multishot continuations allow a given continuation to be resumed more than once, which is useful for tree searches and non-determinism for example. Given that the implementation of singleshot continuations is far simpler libseff uses those.
+
+\subsection{Shallow vs Deep effect handlers}
+
+A shallow effect handler binds an unhandled continuation when called, whereas a deep handler retains its binding over the continuation for subsequent calls. This is equivalent to saying that resumptions from a shallow handler do not return to that handler, whereas for deep handlers once a continuation has been wrapped in a handler it is always so. All shallow handlers can be turned into deep handlers by applying them recursively to continuations, although this can complicate type systems and be hard to reason about formally. libseff, and indeed most implementations, use deep handlers.
+
+\section{What is libseff?}
+
+Although much of the current usage of effect handlers is found in functional languages, there exist libraries that implement effect handling in almost every major language in which it is possible, including C. However, these libraries, such as \textbf{libmpeff}, are mostly designed specifically for compiler implementation, and as such offer features and make implementation decisions that do not necessarily make sense for the generic use case.\citep{libmprompt} \textbf{libseff}, on the other hand, is an implementation of effect handlers for C that is designed to be used directly by programmers.\citep{libseff_paper}
+
+
+
+
+
+
+
+
+\chapter{Changes Made} \label{method}
 
 \section{ID assignment}
 
-As stated above, in libseff effect IDs must be assigned manually by the programmer, which causes many issues. A goal of this project was to have some method for assigning IDs automatically, with the following requirements:
+Below we find the effect signature of an effect in libseff:
 
- - IDs must be unique: no two effects can have the same ID
- - The number of IDs able to be defined must not be bound in any meaningful way
- - Given the above constraints, checking whether a handler handles a given effect should be as fast as possible
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\linewidth]{eff_def.png}
+    \caption{Taken from the ad.c test in the libseff repo}
+\end{figure}
 
-First we turn our attention to ID generation. As widely noted%[CITE HERE]
+The leftmost argument to the macro is the name of the effect. The next argument is the ID of the effect, and this will be discussed below. The final arguments are the return value of the effect and a struct representing the parameters to the effect (all effects in \textit{libseff}, barring the return effect, must return a struct).
+
+Note that the ID is an integer. This value must be provided by the programmer at compile time, and it must be unique - and it is the programmer's job to ensure this. This is not an ideal situation, as creating globally unique IDs is generally not an unsolved problem, and further this can be complicated to maintain; if two new code additions use the same ID, libseff will not give a compiler error. Indeed, if the handlers for these codebases never overlap, the code will run perfectly as intended - until a hapless programmer years down the line runs these two handlers one over the other and creates a truly insidious bug.
+
+Note further that IDs must be unique with reference to any included libraries, including those that may not be available at compile time (dynamically linked libraries, also called shared libraries). This means that the IDs used by a specific library are not an implementation detail but instead part of the interface, and that libraries cannot refactor to define additional effects without either altering their public interface and making a breaking change, or over-allocating IDs, which causes particular problems with the other restriction in base libseff, discussed below.
+
+A goal of this project was to have some method for assigning IDs automatically, with the following requirements:
+
+\begin{itemize}
+\item IDs must be unique: no two effects can have the same ID
+\item The number of IDs able to be defined must not be bound in any meaningful way
+\item Given the above constraints, checking whether a handler handles a given effect should be as fast as possible
+\end{itemize}
+
+We turn our attention to performing automatic ID generation. As noted%[CITE HERE]
 , Universally Unique Identifiers (UUIDs) can be generated through the use of a so-called "magic pointer"%[CITE PLS]
 , or a pointer to a fixed location in memory. Since pointers in C are guaranteed by the standard to only compare equal if they point to the same location%[CITE]
-, (as perhaps you would expect), if a new memory address is assigned for each new effect, IDs generated this way are guaranteed to be unique. In this particular case, user-defined effect IDs are actually a pointer to the address that stores where the default generator for that effect is (it's a double pointer), because this is useful for fetching default handlers and there is no reason not to.
+, (as perhaps you would expect), if a new memory address is assigned for each new effect, IDs generated this way are guaranteed to be unique. In this particular case, user-defined effect IDs are actually a pointer to the address that stores where the default generator for that effect is (it is a double pointer), because this is useful for fetching default handlers and there is no reason not to.
 
 \includegraphics[scale=0.7]{ID_def_code.png}
 
@@ -208,61 +228,94 @@ One issue with this is that effect IDs are no longer fixed at compile time, whic
 
 \section{Effect set representation}
 
-Previously, effect sets were represented as a 64-bit integer, with each bit being 1 implying the handling of the effect with that index as an ID, and similarly 0 means its not handled, as shown below: %[INCLUDE IMAGE OF 0s with like 2 ones and some arrows to them that say "this handles effect 3 and effect 12"]
+Previously, effect sets were represented as a 64-bit integer, with each bit being 1 implying the handling of the effect with that index as an ID, and similarly 0 means its not handled, as shown below: 
 
-The current solution works more like a string - the effect set is a 0-terminated list of word-length integers, each corresponding to an effect. While this does add another layer of pointer indirection, which had [INSERT EFFECT BELOW] as shown below, it also allows the handling of any number of effects per handler, and importantly also implies that the total number of valid effect IDs is not limited to 64, as the previous implementation implied.
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.3\linewidth]{effect_set.png}
+    \caption{This 8-bit effect set handles effects 1 and 5, along with the return effect}
+\end{figure}
+
+This implementation was done to try to avoid a pointer dereference on determining whether a handler handles a given effect. The issues with a limit of 64 effects to large codebases do not need to be spelled out.
+
+The current solution works more like a string - the effect set is a 0-terminated list of word-length integers, each corresponding to an effect. While this does add another layer of pointer indirection, it also allows the handling of any number of effects per handler, and importantly also implies that the total number of valid effect IDs is not limited to 64, as the previous implementation implied.
 
 This is a valid representation because 0, the value of the null pointer, is guaranteed to never be allocated by C. Another special ID was also required - a signifier that this handler handles all effects. Although the address 0x1 is not guaranteed to be unallocated by the C standard, virtually every modern implementation of the C compiler allocates the first [X] bytes from 0 as an inacessible page, and it is thouroughly unlikely to be allocated to an effect halfway through a program.
 
 0x1 is therefore used to signify two different things - when used as an effect ID and passed to libseff, the handler acquirer will understand that every handler handles this effect. When used in an effect set, libseff will understand the handler that handles this effect handles every effect - something that was trivial to write under the old system, bur requires special consideration now - we certainly cannot include every possible pointer in a list!
 
+In the course of this process the default generator resolution process (what to do if there is no valid generator) was changed from an index into a length-64 array to a pointer allocation for each effect, retrievable through taking the value of the effect ID. Since it's a pointer anyway, it may as well point to the location of the pointer to the default generator.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\linewidth]{defeff.png}
+    \caption{Effect Definition}
+    \label{fig:joooo}
+\end{figure}
+
 \section{Syntax changes}
 
-These changes required changes to the syntax of the libseff library. Users now no longer have to (and can't) specify the ID of effects they define. More subtly, a common pattern seen even in the libseff code written to test and benchmark the library was for a handler to switch on the ID of an effect after being called - something no longer possible with effect IDs that aren't defined at compile time. These cases were rewritten as macros that inline to simply being if statements instead, which is less efficient but for small switches they were largely being compiled as ifs anyway. [SOURCE SOURCE SOURCE]
+These changes required changes to the syntax of the libseff library. Users now no longer have to (and can't) specify the ID of effects they define. More subtly, a common pattern seen even in the libseff code written to test and benchmark the library was for a handler to switch on the ID of an effect after being called - something no longer possible with effect IDs that aren't defined at compile time. These cases were rewritten as macros that inline to simply being if statements instead, which is less efficient for large switches but unlikely to come up in practise.
 
 This syntax is slightly more unwieldy but ultimately the provided macros are simply syntactic sugar for unpacking the payload and do not need to be used for users to apply the full range of libseff.
 
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\linewidth]{oldswitch.png}
+    \caption{The old switch implementation}
+    \label{fig:oldswitch}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\linewidth]{newswitch.png}
+    \caption{The new switch implementation with macros}
+    \label{fig:newswitch}
+\end{figure}
+
+
+
+
+
+
+
 \chapter{Evaluation}
 
-\includegraphics[scale=0.3]{table.png}
+When evaluated against the benchmarks found in the \defcitealias{bench-joint}{joint effect benchmarking library}\citetalias{bench-joint}, it was found that this implementation ran faster than the original implementation on almost all benchmarks, which is an unexpected and slightly confusing, albeit welcome, result. 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=1\linewidth]{bench_tests.PNG}
+    \label{fig:benches}
+\end{figure}
+
+
+
+
+
+
+
 
 \chapter{Conclusion}
 
-\section{Final Reminder}
+%In conclusion, my changes are awesome and should be merged into the main repo thank you sam :)
 
-The body of your dissertation, before the references and any appendices,
-\emph{must} finish by page~40. The introduction, after preliminary material,
-should have started on page~1.
-
-You may not change the dissertation format (e.g., reduce the font size, change
-the margins, or reduce the line spacing from the default single spacing). Be
-careful if you copy-paste packages into your document preamble from elsewhere.
-Some \LaTeX{} packages, such as \texttt{fullpage} or \texttt{savetrees}, change
-the margins of your document. Do not include them!
-
-Over-length or incorrectly-formatted dissertations will not be accepted and you
-would have to modify your dissertation and resubmit. You cannot assume we will
-check your submission before the final deadline and if it requires resubmission
-after the deadline to conform to the page and style requirements you will be
-subject to the usual late penalties based on your final submission time.
+In conclusion, these changes increase the verbosity of the system at large and seem to lead to performance speedups as well. The objectives of solving these problems while keeping libseff fast and intuitive have been achieved.
 
 % \bibliographystyle{plain}
 \bibliographystyle{plainnat}
 \bibliography{refs}
 
+\nocite{*}
+
 
 % You may delete everything from \appendix up to \end{document} if you don't need it.
 \appendix
 
-\chapter{First appendix}
+\chapter{Implemented Code}
 
-\section{First section}
-
-Any appendices, including any required ethics information, should be included
-after the references.
-
-Markers do not have to consider appendices. Make sure that your contributions
-are made clear in the main body of the dissertation (within the page limit).
+The implementation of the changes discussed in this document can be found here: 
+\url{https://github.com/Pendscraper/libseff_disc}
 
 
 \end{document}
