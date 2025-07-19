@@ -14,10 +14,13 @@
 % you should catch most accidental changes of page layout though.
 
 \usepackage[nopatch=footnote]{microtype} % recommended, but you can remove if it causes problems
-\usepackage[round]{natbib} % recommended for citations
+%\usepackage[round]{natbib} % recommended for citations
+\usepackage[natbib=true]{biblatex}
+\addbibresource{refs.bib}
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{hyperref}
+\usepackage{doi}
 
 \begin{document}
 \begin{preliminary}
@@ -50,7 +53,7 @@
 \date{\today}
 
 \abstract{
-\textit{libseff} is a lightweight effect handlers library for C using continuations. This paper investigates the existing performance of handler resolution and effect definition in this language, and implements and benchmarks new systems for each, which are found to increase the expressiveness of the language without affecting performance.
+\textit{libseff} is a lightweight effect handlers library for C using continuations. This dissertation investigates the existing performance of handler resolution and effect definition in this library, and implements and benchmarks new systems for each, which are found to increase the expressiveness of the language without affecting performance.
 }
 
 \maketitle
@@ -164,9 +167,20 @@ This program displays several of the characteristic behaviours of effect handler
 \section{Variants}
 There are several different interpretations and implementations of effect handlers, with varying degrees of expressiveness and intuitiveness. Below are some of the more relevant divides.
 
-\subsection{Lexical vs Dynamic binding}
+\subsection{Lexical vs Dynamic binding and the Handler Stack}
 
-Two methods for binding/scoping/resolving handlers are lexical and dynamic binding. Lexical binding has the advantage that handler resolution is a constant-time operation, but requires either a restrictive implementation or an expansive type system. As C barely possesses a type system at all, it was inevitable that libseff would use dynamic binding.
+When an effect of a specific type is performed, which handler should the program execute? 
+
+Two methods for binding/scoping/resolving handlers are lexical and dynamic binding. These differ by what happens when an effect is called by code - dynamically bound handlers must traverse a call stack to find the closest handler for that effect, whereas lexical handlers (at least in theory) can get around this restriction. 
+
+\subsubsection{Lexical Binding}
+
+
+
+\subsubsection{Dynamic Binding}
+
+\subsubsection{Advantages}
+Lexical binding has the advantage that handler resolution is a constant-time operation, but requires either a restrictive implementation or an expansive type system. As C barely possesses a type system at all, it was inevitable that libseff would use dynamic binding.
 
 \subsection{Grouped vs Ungrouped Operations}
 
@@ -303,8 +317,9 @@ When evaluated against the benchmarks found in the \defcitealias{bench-joint}{jo
 In conclusion, these changes increase the verbosity of the system at large and seem to lead to performance speedups as well. The objectives of solving these problems while keeping libseff fast and intuitive have been achieved.
 
 % \bibliographystyle{plain}
-\bibliographystyle{plainnat}
-\bibliography{refs}
+%\bibliographystyle{plainnat}
+%\bibliography{refs}
+\printbibliography
 
 \nocite{*}
 
