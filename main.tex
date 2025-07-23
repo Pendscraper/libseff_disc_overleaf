@@ -16,7 +16,7 @@
 \usepackage{etoolbox}
 \usepackage[nopatch=footnote]{microtype} % recommended, but you can remove if it causes problems
 %\usepackage[round]{natbib} % recommended for citations
-\usepackage[natbib=true,style=authoryear-comp]{biblatex}
+\usepackage[natbib=true,style=numeric]{biblatex}
 \addbibresource{refs.bib}
 \usepackage{graphicx}
 \usepackage{xcolor}
@@ -224,20 +224,19 @@ The leftmost argument to the macro is the name of the effect. The next argument 
 
 Note that the ID is an integer. This value must be provided by the programmer at compile time, and it must be unique across all used files - and it is the programmer's job to ensure this. This would be time-consuming to maintain by hand in large codebases and is also unnecessarily dangerous, as \textbf{libseff} does not inform the programmer if their ID is not unique.
 
-This causes particular difficulties when external libraries that also use effects are considered: since \textbf{libseff} uses dynamic binding, the handler stack\todo* must be traversed to find the nearest handler for the given effect. If effects are intermingled between libraries, as shown below\todo{insert two images, one with the definitions of these functions and another with the handler stack}, 
+This causes particular difficulties when external libraries that also use effects are considered:  the requirement of unique tag selection across translation units "limits expressiveness ... [and] introduces the potential for insidious bugs when different libraries introduce distinct operations that share the same tag."\cite{libseff_paper} Since \textbf{libseff} uses dynamic binding\cite{libseff_paper}, the handler stack\todo* must be traversed to find the nearest handler for the given effect. If effects are intermingled between libraries, as shown below\todo{insert two images, one with the definitions of these functions and another with the handler stack}, then an effect performed by one coroutine can be erroneously intercepted by an enclosing handler from another library, with entirely unpredictable consequences, given the two effects need not even have the same type!
 
-A goal of this project was to have some method for assigning IDs automatically, with the following requirements:
+Therefore, a goal of this project was to have some method for automatically assigning IDs, with the following requirements:
 
 \begin{itemize}
-\item IDs must be unique: no two effects can have the same ID
-\item The number of IDs able to be defined must not be bound in any meaningful way
+\item IDs must be unique within and between linked translation units
+\item The number of IDs able to be defined must not be significantly constrained
 \item Given the above constraints, checking whether a handler handles a given effect should be as fast as possible
 \end{itemize}
 
-We turn our attention to performing automatic ID generation. As noted%[CITE HERE]
-, Universally Unique Identifiers (UUIDs) can be generated through the use of a so-called "magic pointer"%[CITE PLS]
-, or a pointer to a fixed location in memory. Since pointers in C are guaranteed by the standard to only compare equal if they point to the same location%[CITE]
-, (as perhaps you would expect), if a new memory address is assigned for each new effect, IDs generated this way are guaranteed to be unique. In this particular case, user-defined effect IDs are actually a pointer to the address that stores where the default generator for that effect is (it is a double pointer), because this is useful for fetching default handlers and there is no reason not to.
+One method for GUID generation that meets the above requirements is to use the address of allocated memory as IDs. Since pointers to different objects are guaranteed to be unequal in C\textcite[see § 6.5.10 para 7]{iso9899-2024}, simply ensuring the address isn't deallocated will mean that IDs generated in this fashion are unique. This trick is also used in the \textbf{libmprompt} library, see \href{https://github.com/koka-lang/libmprompt/blob/main/include/mpeff.h#L155}{here}.\cite{libmprompt}
+
+Since tags are really just pointers to somewhere in memory, we may as well use this to store some information about the effect at this address - for static effects, this points to a global variable that holds a pointer that points to the set default handler implementation, i.e. \todo{image of typedef of effect id} $*eff\_id = some\_default\_handler\_location$.
 
 \includegraphics[scale=0.7]{ID_def_code.png}
 
@@ -291,6 +290,14 @@ This syntax is slightly more unwieldy but ultimately the provided macros are sim
 \end{figure}
 
 
+
+\section{Generative Effects}
+
+In the new implementation, the dynamic generation of new effect IDs is possible, through provided functions $seff\_alloc\_gen\_id$ and $seff\_dealloc\_gen\_id$. These functions allocate and deallocate, respectively, a new node to a doubly linked list, where the address of nodes represents effect IDs. This guarantees the independence of these IDs from each other and from already allocated IDs for as long as the node remains allocated.
+
+As normal effect tags can be considered to be double pointers to effect handlers, so too can generated tags: the first value of every node is a pointer to the location of the default handler, as shown below:\todo
+
+One potential drawback of generative effects is 
 
 
 
