@@ -262,14 +262,13 @@ Previously, effect sets were represented as a 64-bit integer, with each index re
     \caption{This 8-bit effect set handles effects 1 and 5, along with the return effect}
 \end{figure}
 
-This is a swift and lightweight implementation that is unfortunately quite unsuitable for use in environments with many defined effects, as the 64 effect limit is restrictive, and the naive solution of extending the indices available scales terribly - the memory per effect set is proportional to the number of effects!
-
-
-and importantly also means that the number of effects defined has no relation to the amount of memory required, only the number of effects this specific handler \textit{handles}.
+This is a swift and lightweight implementation that is unfortunately quite unsuitable for use in environments with many defined effects, as the 64 effect limit is restrictive, and the naive solution of extending the indices available scales terribly - the memory per effect set is proportional to the number of effects! One of the primary goals of this project was to resolve this limitation.
 
 \subsection{Current implementations} \label{impls_here}
 
-Two other representations have instead been implemented, both using a simple list traversal for ID detection - one stores effects as a NULL-terminated list, and the other stores the list size as the first element of the list. Both of these implementations allow for an unlimited number of handled effects per handler, and importantly the amount of memory required does not depend on the number of defined effects - only on the number of handled effects. The relative performance of these systems is discussed in \Cref{eval}.
+Several other implementations have been created and benchmarked, and will be detailed below. Their relative performance is discussed in \Cref{eval}.
+
+The first implementation created stored 
 
 \begin{figure}[ht]
     \centering
@@ -314,7 +313,7 @@ One potential drawback of generative effects is that their effect IDs need to be
 
 \chapter{Evaluation} \label{eval}
 
-The new implementations were tested against the existing tests for the \textbf{libseff} library, along with some new tests, such as a test of the new capability to provide generative effects and those effects' implementation of default handler capability. All of these tests were passed; the new software is correct, and performs to the specification.
+The new implementations were tested against the existing tests for the \textbf{libseff} library, along with some new tests, such as a test of the new capability to provide generative effects and those effects' implementation of default handler capability (see \cref{appx} for details). All of these tests were passed; the new software is correct, and performs to the specification.
 
 \begin{figure}[ht]
     \centering
@@ -335,6 +334,13 @@ These results show that in many normal programs using \textbf{libseff}, the perf
 \end{figure}
 
 A new family of benchmarks, $handler\_stack\_bench$, was written to test the new, more expressive implementation against the original code in the worst possible conditions. A large handler stack with a large number of handled effects on each level is created and the program must find the relevant handler several times, which in both implementations involves checking each level to see if it handles the performed effect. \Cref{fig:adjusted} contains the results of this benchmarking as the number of effects each of the intermediate handlers handles increases.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\linewidth]{lines_new.png}
+    \caption{}
+    \label{fig:parametrized_actual}
+\end{figure}
 
 Note that the original \textbf{libseff} implementation is asymptotically faster, as well as being faster for any number of effects tested, but cannot handle any number of effects above 63 (as an effect tag is reserved for the predefined RETURN effect).
 
@@ -409,7 +415,7 @@ The \textbf{libseff} library had several limitations, like a requirement that
 % You may delete everything from \appendix up to \end{document} if you don't need it.
 \appendix
 
-\chapter{Implemented Code}
+\chapter{Implemented Code} \label{appx}
 
 The implementation of the changes discussed in this document can be found here: 
 \url{https://github.com/Pendscraper/libseff_disc}
