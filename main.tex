@@ -23,14 +23,17 @@
 \usepackage{hyperref}
 \usepackage{doi}
 \usepackage[nameinlink]{cleveref}
-\crefname{todo}{TODO}{TODOs}
-\usepackage{todo}
 \usepackage{comment}
+\usepackage{listings}
+
+\lstset{
+    language=C
+}
 
 \begin{document}
 \begin{preliminary}
 
-\title{Extensions to libseff, an effect handler implementation using continuations in C}
+\title{Extensions to libseff, an effect handler library using continuations in C}
 
 \author{Jamie Day}
 
@@ -181,23 +184,23 @@ This program displays several of the characteristic behaviours of effect handler
 \section{Variants}
 There are several different interpretations and implementations of effect handlers, with varying degrees of expressiveness and intuitiveness. Below are some of the more relevant divides.
 
-\subsection{Lexical vs Dynamic binding and the Handler Stack}
+\subsection{Lexical vs Dynamic Binding and the Handler Stack}
 
 When an effect of a specific type is performed, which handler should the program execute? 
 
-Two methods for binding/scoping/resolving handlers are lexical and dynamic binding. These differ by what happens when an effect is called by code - dynamically bound handlers must traverse a call stack to find the closest handler for that effect, whereas lexical handlers (at least in theory) can get around this restriction.
+Two methods for binding/scoping/resolving handlers are lexical and dynamic binding.\citep{lexical} These differ by what happens when an effect is called by code - dynamically bound handlers must traverse a call stack to find the closest handler for that effect, whereas lexical handlers (at least in theory) can get around this restriction.
 
-Lexical binding has the advantage that handler resolution is a constant-time operation, but requires either a restrictive implementation or an expansive type system. As C barely possesses a type system at all, it was logical that \textbf{libseff} would use dynamic binding.
+Specific types of lexical binding has the advantage that handler resolution is a constant-time operation, but requires either a restrictive implementation or an expansive type system. As C barely possesses a type system at all, it was logical that \textbf{libseff} would use dynamic binding.
 
 \subsection{Grouped vs Ungrouped Operations}
 
 While in the ungrouped form effects are a single operation that is performed by itself, and a handler can handle many effects, with grouped operations an effect is a group of operations, and each handler can only handle one group. In this way effect definition looks more like interface definition in Java for example. \textbf{libseff} uses ungrouped effects (sometimes called singleton effects \citep{effekt-website}), which could be considered to be to be more useful for the average programmer than the libmpeff implementation, which is grouped.
 
-\subsection{Single vs Multishot continuations}
+\subsection{Single vs Multishot Continuations}
 
-A handler that uses singleshot continuations can only resume a given continuation once, after which it will be overwritten by a new continuation or in some other way made invalid. Multishot continuations allow a given continuation to be resumed more than once, which has applications in tasks including tree searches, back-tracking, and non-deterministic algorithms. Since a given coroutine must be able to run more than once in such systems, coroutines cannot run in place and the coroutine's portion of the stack must be copied. Since stack copying is unsafe in C given the possibility of escaping pointers into the stack, stack copying is unfeasible for most libraries that call user-provided functions, and hence \textbf{libseff} has single-shot continuations.
+A handler that uses singleshot continuations can only resume a given continuation once, after which it will be overwritten by a new continuation or in some other way made invalid. Multishot continuations allow a given continuation to be resumed more than once, which has applications in tasks including tree searches, back-tracking, and non-deterministic algorithms. Since a given coroutine must be able to run more than once in such systems, coroutines cannot run in place and the coroutine's portion of the stack must be copied.\citep{libseff_paper} Since stack copying is unsafe in C given the possibility of escaping pointers into the stack, stack copying is unfeasible for most libraries that call user-provided functions, and hence \textbf{libseff} has single-shot continuations.
 
-\subsection{Shallow vs Deep effect handlers}
+\subsection{Shallow vs Deep Effect Handlers}
 
 A shallow effect handler binds an unhandled continuation when called, whereas a deep handler retains its binding over the continuation for subsequent calls. This is equivalent to saying that resumptions from a shallow handler do not return to that handler, whereas for deep handlers once a continuation has been wrapped in a handler it is always so. All shallow handlers can be turned into deep handlers by applying them recursively to continuations, although this can complicate type systems and be hard to reason about formally. \textbf{libseff} uses a combination of shallow and deep handlers, referred to as \textit{sheep} handlers after the name was coined in \textcite{wasmFX}
 This means that the original handler is not automatically installed when continuation resumes, although there must be some handler installed. In \textbf{libseff} specifically, the effect set may be empty. \citep{libseff_paper}
@@ -231,7 +234,7 @@ The leftmost argument to the macro is the name of the effect. The next argument 
 
 Note that the ID is an integer. This value must be provided by the programmer at compile time, and it must be unique across all used files - and it is the programmer's job to ensure this. This would be time-consuming to maintain by hand in large codebases and is also unnecessarily dangerous, as \textbf{libseff} does not inform the programmer if their ID is not unique.
 
-This causes particular difficulties when external libraries that also use effects are considered: the requirement of unique tag selection across translation units "limits expressiveness ... [and] introduces the potential for insidious bugs when different libraries introduce distinct operations that share the same tag."\cite{libseff_paper} Since \textbf{libseff} uses dynamic binding\cite{libseff_paper}, the handler stack\todo* must be traversed to find the nearest handler for the given effect. If effects are intermingled between libraries, as shown below\todo{insert two images, one with the definitions of these functions and another with the handler stack}, then an effect performed by one coroutine can be erroneously intercepted by an enclosing handler from another library, with entirely unpredictable consequences, given the two effects need not even have the same type!
+This causes particular difficulties when external libraries that also use effects are considered: the requirement of unique tag selection across translation units "limits expressiveness ... [and] introduces the potential for insidious bugs when different libraries introduce distinct operations that share the same tag."\cite{libseff_paper} Since \textbf{libseff} uses dynamic binding\cite{libseff_paper}, the handler stack (first formalised in \textcite{handler-stack-first}) must be traversed to find the nearest handler for the given effect. If effects are intermingled between libraries then an effect performed by one coroutine can be erroneously intercepted by an enclosing handler from another library, with entirely unpredictable consequences, given the two effects need not even have the same type!
 
 Therefore, a goal of this project was to have some method for automatically assigning IDs, with the following requirements:
 
@@ -241,14 +244,18 @@ Therefore, a goal of this project was to have some method for automatically assi
 \item Given the above constraints, checking whether a handler handles a given effect should be as fast as possible
 \end{itemize}
 
-One method for GUID generation that meets the above requirements is to use the address of allocated memory as IDs. Since pointers to different objects are guaranteed to be unequal in C\textcite[see § 6.5.10 para 7]{iso9899-2024}, simply ensuring the address isn't deallocated will mean that IDs generated in this fashion are unique. This trick is also used in the \textbf{libmprompt} library, see \href{https://github.com/koka-lang/libmprompt/blob/main/include/mpeff.h#L155}{here}.\cite{libmprompt}
+One method for GUID generation that meets the above requirements is to use the address of allocated memory as IDs. Since pointers to different objects are guaranteed to be unequal in C\textcite[see § 6.5.10 para 7]{iso9899-2024}, simply ensuring the address isn't deallocated will mean that IDs generated in this fashion are unique. This trick is also used in the \textbf{libmprompt} library, see \href{https://github.com/koka-lang/libmprompt/blob/main/include/mpeff.h#L155}{below}.\cite{libmprompt}
 
 \includegraphics[scale=0.7]{ID_def_code.png}
 
-Since tags are really just pointers to somewhere in memory, we may as well use this to store some information about the effect at this address - for static effects, this points to a global variable that holds a pointer that points to the set default handler implementation, i.e. \todo{image of typedef of effect id} $*eff\_id = some\_default\_handler\_location$. This stands as opposed to the prior representation, of an array of preset size holding pointers to default handlers, which is quite unusable when that size is the size of your entire memory.
+Since tags are really just pointers to somewhere in memory, we may as well use this to store some information about the effect at this address - for static effects, this points to a global variable that holds a pointer that points to the set default handler implementation:
+
+\lstinline{typedef default_handler_t** effect_id;}
+
+This stands as opposed to the prior representation, of an array of preset size holding pointers to default handlers, which is quite unusable when that size is the size of your entire memory.
 
 
-This change in types and assignment time has carry-on effects on the rest of the library, including that switching on the effect ID returned by $seff\_resume$ is no longer possible, since the ID of a given effect is not a constant at compile time and hence cannot be used in \textcolor{teal}{case} statements. A new macro was introduced, $CASE\_SWITCH$, and the $CASE\_EFFECT$ macros redefined (see \cref{Syntax}), so that these are simply \textcolor{teal}{if} statements under the hood. This will be less performant for handlers that handle large numbers of effects, but that is expected to be relatively rare in actual code.
+This change in types and assignment time has carry-on effects on the rest of the library, including that switching on the effect ID returned by $seff\_resume$ is no longer possible, since the ID of a given effect is not a constant at compile time and hence cannot be used in \textcolor{teal}{case} statements. A new macro was introduced, $CASE\_SWITCH$, and the $CASE\_EFFECT$ macros redefined (see \Cref{Syntax}), so that these are simply \textcolor{teal}{if} statements under the hood. This will be less performant for handlers that handle large numbers of effects, but that is expected to be relatively rare in actual code.
 
 \section{Effect set representation}
 
@@ -282,7 +289,7 @@ Given these limitations, a new implementation was devised, based on the initial,
 
 \subsubsection{Binary Search}
 
-A linear search of the effect set is efficient for small sizes, but has significantly worse performance in the case that the effect set is wide. An implementation was created that instead runs a binary search on the effect set, with significantly better asymptotic performance ($O(n)$ vs $O(log(n))$). This did however require that effect sets be sorted, which has an impact on performance in some cases (see \cref{eval}).
+A linear search of the effect set is efficient for small sizes, but has significantly worse performance in the case that the effect set is wide. An implementation was created that instead runs a binary search on the effect set, with significantly better asymptotic performance ($O(n)$ vs $O(log(n))$). This did however require that effect sets be sorted, which has an impact on performance in some cases (see \Cref{eval}).
 
 Two implementations of this type were created: A naive binary search, and a binary search that becomes a linear search after the size of the possible list is at most 30 entries.
 
@@ -290,8 +297,8 @@ Two implementations of this type were created: A naive binary search, and a bina
 
 Several other implementations were considered:
 \begin{itemize}
+    \item \textbf{Hybrid Representation}: A combination of some fast searching implementation, such as the original implementation, and an efficient implementation. This would require dispatch on some kind of type ID. This ID could necessarily not fit into a pointer size with a whole pointer, and since we are limited to a pointer as above this would still require a pointer dispatch, which removes one of the main performance benefits of the original implementation and becomes equivalent at best to most implementations here on the case of a short effect set, the most common case by far.
     \item \textbf{Set-based effect set representation}: This was discounted given that the call to $qsort$ in the binary search implementations was significant enough to be problematic for performance in some cases, and the setup of a set would be significantly more demanding.
-    \item todo%\todo
 \end{itemize}
 
 \begin{figure}[ht]
@@ -307,7 +314,7 @@ These changes required changes to the syntax of the \textbf{libseff} library. Ef
 
 Users now no longer have to (and can't) specify the ID of effects they define. More subtly, a common pattern seen even in the libseff code written to test and benchmark the library was for a handler to switch on the ID of an effect after being called - something no longer possible with effect IDs that aren't defined at compile time. These cases were rewritten as macros that inline to simply being if statements instead, which is less efficient for large switches but unlikely to come up in practise.
 
-This syntax is slightly more unwieldy but ultimately the provided macros are simply syntactic sugar for unpacking the payload and do not need to be used for users to apply the full range of \textbf{libseff}. \todo{Cooler syntax, maybe side by side?}
+This syntax is slightly more unwieldy but ultimately the provided macros are simply syntactic sugar for unpacking the payload and do not need to be used for users to apply the full range of \textbf{libseff}.
 
 \begin{figure}[ht]
     \centering
@@ -327,17 +334,25 @@ This syntax is slightly more unwieldy but ultimately the provided macros are sim
 
 In the new implementation, the dynamic generation of new effect IDs is possible, through provided functions $seff\_alloc\_gen\_id$ and $seff\_dealloc\_gen\_id$. These functions allocate and deallocate, respectively, a new node to a doubly linked list, where the address of nodes represents effect IDs. This guarantees the independence of these IDs from each other and from already allocated IDs for as long as the node remains allocated.
 
-As normal effect tags can be considered to be double pointers to effect handlers, so too can generated tags: the first value of every node is a pointer to the location of the default handler, as shown below:\todo
+As normal effect tags can be considered to be double pointers to effect handlers, so too can generated tags: the first value of every node is a pointer to the location of the default handler, as shown below:
 
-One potential drawback of generative effects is that their effect IDs need to be manually passed around.\todo{do more research on generative effects} Another is that the programmer must take care to manually clean up generated effects when done with them, as is standard practice in C, and this may be more difficult than usual in an environment with unusual control flow, as coroutines tend to produce. This is already the case with the definition of \textit{coroutine} objects. Finally, generative effects do not provide any type-checking, and cannot use the base macros ($PERFORM$, $YIELD$, $THROW$) and must manually call the backend functions instead - automating this process and re-providing some type-checking is a possible area for future work.
+\begin{lstlisting}
+typedef struct _effect_id_generative_cell {
+    default_handler_t *handler;
+    _effect_id_generative_cell *previous;
+    _effect_id_generative_cell *next;
+}
+\end{lstlisting}
+
+One potential drawback of generative effects is that their effect IDs need to be manually passed around. Another is that the programmer must take care to manually clean up generated effects when done with them, as is standard practice in C, and this may be more difficult than usual in an environment with unusual control flow, as coroutines tend to produce. This is already the case with the definition of \textit{coroutine} objects. Finally, generative effects do not provide any type-checking, and cannot use the base macros ($PERFORM$, $YIELD$, $THROW$) and must manually call the backend functions instead - automating this process and re-providing some type-checking is a possible area for future work.
 
 
 
 
 
-\chapter{Benchmarking and Evaluation} \label{eval}
+\chapter{Results and Evaluation} \label{eval}
 
-The new implementations were tested against the existing tests for the \textbf{libseff} library, along with some new tests, such as a test of the new capability to provide generative effects and those effects' implementation of default handler capability (see \cref{appx} for details). All of these tests were passed; the new software is correct, and performs to the specification.
+The new implementations were tested against the existing tests for the \textbf{libseff} library, along with some new tests, such as a test of the new capability to provide generative effects and those effects' implementation of default handler capability (see \Cref{appx} for details). All of these tests were passed; the new software is correct, and performs to the specification.
 
 \begin{comment}
 \begin{figure}[ht]
@@ -348,7 +363,7 @@ The new implementations were tested against the existing tests for the \textbf{l
 \end{figure}
 \end{comment}
 
-Benchmarks used by the original \textbf{libseff} library were rewritten to use the new syntax introduced (see \cref{method}), and in some cases the default number of iterations was adjusted: the number of iterations of $ad\_bench$ benchmark, for example, had to be increased to get results that were not mostly random noise from startup and shutdown. The $exception\_bench$ family of benchmarks was revised down to allow for ease of benchmarking, as their runtimes were observed to remain consistent even with the decreased iteration counts. These benchmarks can be found in \cref{fig:many}.
+Benchmarks used by the original \textbf{libseff} library were rewritten to use the new syntax introduced (see \Cref{method}), and in some cases the default number of iterations was adjusted: the number of iterations of $ad\_bench$ benchmark, for example, had to be increased to get results that were not mostly random noise from startup and shutdown. The $exception\_bench$ family of benchmarks was revised down to allow for ease of benchmarking, as their runtimes were observed to remain consistent even with the decreased iteration counts. These benchmarks can be found in \cref{fig:many}.
 
 \begin{figure}[ht]
     \centering
@@ -357,28 +372,28 @@ Benchmarks used by the original \textbf{libseff} library were rewritten to use t
     \label{fig:many}
 \end{figure}
 
-The results in \cref{fig:many} show the different performances of the various implementations on these benchmarks, as a ratio with the median runtime of the original implementation. As can be seen, many of these runtime ratios cluster at around \textbf{1x}, or the different implementations having no effect on the median runtime.
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=1\linewidth]{Various runtimes.png}
+    \caption{Alternate representation of benchmark runtime}
+    \label{fig:squishline}
+\end{figure}
+
+The results in \cref{fig:many} (and alternatively \cref{fig:squishline}) show the different performances of the various implementations on these benchmarks, as a ratio with the median runtime of the original implementation. As can be seen, many of these runtime ratios cluster at around \textbf{1x}, or the different implementations having no effect on the median runtime.
 
 However, some of the tests show different results:
 \begin{itemize}
     \item \textbf{$state\_bench$:} On the $state\_bench$ benchmarks, it is seen that although the two basic implementations show essentially similar performance to the original, the binary search implementations and the automated memory implementation are much slower. This is likely because this benchmark has a large number of calls to $seff\_resume$ as a proportion of its runtime compared to other benchmarks, and the latter implementations all perform intensive operations whenever $seff\_resume$ is called (a call to $qsort$ and a call to $malloc$, respectively).
-    \item \textbf{$chameneos\_bench$:} These benchmarks show a large runtime difference, but this is because todo%\todo
-    \item \textbf{$exception\_nested\_bench/libseff$:} This benchmarks is again similar for the standard implementations, but todo%\todo
+    \item \textbf{$chameneos\_bench$:} These benchmarks show a large runtime difference, but this is because of differences in startup time and program initialisation - compared to the initial implementation startup seems here to be slower. These tests did however have large standard deviations (see \Cref{appx}) and more research on this area could be interesting for embedded systems where this is more of a concern.
+    \item \textbf{$exception\_nested\_bench/libseff$:} Similarly, this benchmark shows large changes compared to other benchmarks, which is possibly the result of a cache overflow or other hardware change, but warrants future research.
 \end{itemize}
-
-\begin{figure}[ht]
-    \centering
-    \includegraphics[width=\linewidth]{width_parametrized_performance.png}
-    \caption{}
-    \label{fig:adjusted}
-\end{figure}
 
 A new family of benchmarks, $handler\_stack\_bench$, was written to test the new, more expressive implementation against the original code in the worst possible conditions. A large handler stack with a large number of handled effects on each level is created and the program must find the relevant handler several times, which in both implementations involves checking each level to see if it handles the performed effect. \Cref{fig:parametrized_actual} contains the results of this benchmarking as the number of effects each of the intermediate handlers handles increases.
 
 \begin{figure}[ht]
     \centering
     \includegraphics[width=\linewidth]{lines_new.png}
-    \caption{}
+    \caption{Variation in performances across implementations}
     \label{fig:parametrized_actual}
 \end{figure}
 
@@ -440,14 +455,15 @@ As we can see from \cref{fig:adjusted}, both implementations perform worse when 
 
 %In conclusion, my changes are awesome and should be merged into the main repo thank you sam :)
 
-The \textbf{libseff} library had several limitations that were resolved in this dissertation, namely a requirement that effect tags be manually provided and a limitation to the number of defined effects borne out of the effect set representation. Effect tags are now generated by taking pointers to newly allocated memory and are hence unique, and default effect handling has been integrated into this system. 
+The \textbf{libseff} library had several limitations that were resolved in this dissertation, namely a requirement that effect tags be manually provided and a limitation to the number of defined effects borne out of the representation of the effect set. Effect tags are now generated by taking pointers to newly allocated memory and are hence unique, and default effect handling has been integrated into this system. 
 
 Several new possible implementations for effect sets have been selected, implemented and benchmarked. These results show that the new implementation of effect sets is basically equivalent in performance to the original in the general case, but if much of the runtime is effect resumption, performance differences between the implementations start to become relevant, with some implementations having better performance with short effect sets and others with better asymptotic performance as the size of these sets increases.
 
-One possible interesting idea for future work is investigating whether requiring effect sets to be presorted before being supplied to a handler would be an unintuitive requirement on the programmer - this would likely lead to better performance for the binary search implementations in the instances shown in \cref{eval} in most cases. One area of investigation with this approach is to consider how common shared constant effect sets would be, which may be less than seems apparent as for performance reasons effect sets are \textit{not} copied when passed to a handler. These sets would likely have to be guaranteed to be fixed throughout the lifetime of the longest-lasting continuation to avoid unintuitive effects.
+One possible interesting idea for future work is investigating requiring effect sets to be presorted before being supplied to a handler. This may be unintuitive requirement for the programmer but would likely lead to better performance for the binary search implementations in the instances shown in \Cref{eval} in most cases. One area of investigation with this approach is to consider how common shared constant effect sets would be, which may be less than seems apparent as for performance reasons effect sets are \textit{not} copied when passed to a handler. These sets would likely have to be guaranteed to be fixed throughout the lifetime of the longest-lasting continuation to avoid unintuitive effects.
 
 Another useful addition would be macros that allow for performing basic set operations (union, addition, check for contains) on effect sets, as these seem like plausible use cases and an expansion of the abstraction to cover these would be useful both for the programmer, who does not need to know what's "under the hood", and the maintainer who can change the representation at will.
 
+\clearpage
 % \bibliographystyle{plain}
 %\bibliographystyle{plainnat}
 %\bibliography{refs}
@@ -461,15 +477,12 @@ Another useful addition would be macros that allow for performing basic set oper
 % You may delete everything from \appendix up to \end{document} if you don't need it.
 \appendix
 
-\chapter{Implemented Code} \label{appx}
+\chapter*{Appendix} \label{appx}
 
 The implementation of the changes discussed in this document can be found here: 
 \url{https://github.com/Pendscraper/libseff_disc}
 
 A full list of the documents cited can be found here:
 \url{https://github.com/Pendscraper/libseff_disc_overleaf/tree/main/papers}
-
-
-%\todos
 
 \end{document}
